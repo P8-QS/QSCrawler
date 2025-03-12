@@ -5,6 +5,7 @@
 .vscode/
 .idea/
 
+Export/
 *_DoNotShip/
 .utmp/
 /[Ll]ibrary/

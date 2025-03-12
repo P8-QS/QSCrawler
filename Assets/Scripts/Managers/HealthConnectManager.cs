@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Android;
 
@@ -8,23 +10,27 @@ namespace Managers
     {
         private AndroidJavaObject _healthConnectClient;
         private AndroidJavaObject _healthConnectPlugin;
-        
-        private const string ProviderPackageName = "com.google.android.apps.healthdata";
-    
-        private void Start()
-        {
-            TestPlugin();
-            // CheckHealthConnectAvailability();
-        }
 
-        private void TestPlugin()
+        private const string ProviderPackageName = "com.google.android.apps.healthdata";
+        private static readonly string[] RequiredPermissions = new[]
+        {
+            "android.permission.health.READ_STEPS",
+            "android.permission.health.READ_SLEEP"
+        };
+
+        private void Start()
         {
             if (Application.platform != RuntimePlatform.Android)
             {
-                Debug.Log("Not running on Android");
+                Debug.LogWarning("Not running on Android. Skipping Health Connect API initialization");
                 return;
             }
             
+            InitializeHealthConnectClient();
+        }
+
+        private void InitializeHealthConnectClient()
+        {
             var unityClass = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
             var unityActivity = unityClass.GetStatic<AndroidJavaObject>("currentActivity");
             
@@ -32,80 +38,73 @@ namespace Managers
             {
                 _healthConnectPlugin = new AndroidJavaObject("org.p8qs.healthconnectplugin.UnityPlugin", unityActivity);
                 
-                Debug.Log("Checking for health connect permissions");
-                var hasPerms = _healthConnectPlugin.Call<int>("HasPermissions");
-                
-                if (hasPerms == 1)
-                {
-                    Debug.LogWarning("Has Permissions");
-                    _healthConnectPlugin.Call("ReadStepsDay");
-                }
-                else
-                {
-                    Debug.LogWarning("Permission denied");
-                    _healthConnectPlugin.Call("ReadStepsDay");
-
-                    // RequestHealthConnectPermissions(unityActivity);
-                }
+                _healthConnectPlugin.Call(
+                    "CheckHealthConnectAvailability",
+                    gameObject.name,
+                    "OnHealthConnectUnavailable",
+                    "OnHealthConnectUpdateRequired",
+                    "OnHealthConnectAvailable"
+                );
             }));
-            
-            
         }
 
-        private void CheckHealthConnectAvailability()
+        private void OnHealthConnectUnavailable(string response)
         {
-            if (Application.platform != RuntimePlatform.Android)
-            {
-                Debug.Log("Not running on Android, skipping Health Connect check.");
-                return;
-            }
+            Debug.Log("Received Health Connect unavailable response from HealthConnectPlugin");
+            // TODO: Implement logic for when user does not have Health Connect installed.
+        }
+        
+        private void OnHealthConnectUpdateRequired(string response)
+        {
+            Debug.Log("Received Health Connect update required response from HealthConnectPlugin");
+            // TODO: Implement logic for requiring user to update Health Connect app.
+        }
+        
+        private void OnHealthConnectAvailable(string response)
+        {
+            Debug.Log("Received Health Connect available response from HealthConnectPlugin");
+            var hasPerms = HasAllRequiredPermissions();
             
-            var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
-            var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity");
-            var healthConnectClientClass = new AndroidJavaClass("androidx.health.connect.client.HealthConnectClient");
-            var availabilityStatus = healthConnectClientClass.CallStatic<int>("getSdkStatus", activity, ProviderPackageName);
-
-            if (availabilityStatus == healthConnectClientClass.GetStatic<int>("SDK_UNAVAILABLE")) 
+            if (!hasPerms)
             {
-                Debug.Log("Health Connect SDK is unavailable.");
-                return;
+                var callbacks = new PermissionCallbacks();
+                callbacks.PermissionGranted += OnStepsPermissionGranted;
+                Permission.RequestUserPermissions(RequiredPermissions, callbacks);
             }
-
-            if (availabilityStatus == healthConnectClientClass.GetStatic<int>("SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED"))
-            {
-                Debug.Log("Health Connect requires an update.");
-                RedirectToPlayStore();
-            }
-
-            Debug.Log("Health Connect is available.");
-            _healthConnectClient = healthConnectClientClass.CallStatic<AndroidJavaObject>("getOrCreate", activity);
-
-            RequestHealthConnectPermissions(activity);
+            // _healthConnectPlugin.Call(
+            //     "GetPermissionsStatus",
+            //     gameObject.name,
+            //     "OnPermissionsStatusReceived",
+            //     RequiredPermissions
+            // );
         }
 
-        private void RequestHealthConnectPermissions(AndroidJavaObject activity)
+        private void OnPermissionsStatusReceived(string response)
         {
-            const string readStepsPermission = "android.permission.health.READ_STEPS";
-
-            if (Permission.HasUserAuthorizedPermission(readStepsPermission))
+            Debug.Log("Received Health Connect permissions response from HealthConnectPlugin");
+            Debug.LogWarning(response);
+        }
+        
+        private static bool HasAllRequiredPermissions()
+        {
+            var authorizedPermissions = RequiredPermissions.Select(Permission.HasUserAuthorizedPermission);
+            
+            if (authorizedPermissions.Any(permission => permission == false))
             {
-                Debug.Log("Reading steps permission has been granted.");
-                OnStepsPermissionGranted(readStepsPermission);
+                Debug.Log("All Health Connect permissions have not been granted. Requesting from user");
+                return false;    
             }
             else
             {
-                Debug.Log("Reading steps permission is not granted. Requesting permission.");
-                
-                var callbacks = new PermissionCallbacks();
-                callbacks.PermissionGranted += OnStepsPermissionGranted;
-                Permission.RequestUserPermission(readStepsPermission, callbacks);
+                Debug.Log("All Health Connect permissions have been granted.");
+                return true;
             }
         }
 
         private void OnStepsPermissionGranted(string permissionName)
         {
             Debug.Log($"OnStepsPermissionGranted: {permissionName}");
-            _healthConnectPlugin.Call("ReadStepsDay");
+            // _healthConnectPlugin.Call("ReadStepsDay");
 
             
             // var stepsCount = GetDayStepCount();

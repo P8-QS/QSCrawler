@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using Managers;
-using UnityEditor.SearchService;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Scene = UnityEngine.SceneManagement.Scene;
