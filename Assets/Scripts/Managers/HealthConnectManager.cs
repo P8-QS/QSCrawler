@@ -68,15 +68,23 @@ namespace Managers
             if (!hasPerms)
             {
                 var callbacks = new PermissionCallbacks();
-                callbacks.PermissionGranted += OnStepsPermissionGranted;
+                callbacks.PermissionGranted += OnPermissionGranted;
                 Permission.RequestUserPermissions(RequiredPermissions, callbacks);
             }
-            // _healthConnectPlugin.Call(
-            //     "GetPermissionsStatus",
-            //     gameObject.name,
-            //     "OnPermissionsStatusReceived",
-            //     RequiredPermissions
-            // );
+
+            var ldt = new AndroidJavaClass("java.time.LocalDateTime");
+            var now = ldt.CallStatic<AndroidJavaObject>("now");
+            var yesterday = now.Call<AndroidJavaObject>("minusWeeks", (long)4);
+            var timeRangeFilterClass = new AndroidJavaClass("androidx.health.connect.client.time.TimeRangeFilter");
+            var timeRangeFilter = timeRangeFilterClass.CallStatic<AndroidJavaObject>("between", yesterday, now);
+            
+            _healthConnectPlugin.Call("ReadStepsRecords", gameObject.name, "OnStepsRecords", timeRangeFilter);
+        }
+
+        private void OnStepsRecords(string response)
+        {
+            Debug.Log("Received Health Connect steps response from HealthConnectPlugin::::JSON:::::");
+            Debug.Log(response);
         }
 
         private void OnPermissionsStatusReceived(string response)
@@ -101,14 +109,14 @@ namespace Managers
             }
         }
 
-        private void OnStepsPermissionGranted(string permissionName)
+        private void OnPermissionGranted(string permissionName)
         {
-            Debug.Log($"OnStepsPermissionGranted: {permissionName}");
-            // _healthConnectPlugin.Call("ReadStepsDay");
+            Debug.Log($"OnPermissionGranted: {permissionName}");
 
-            
-            // var stepsCount = GetDayStepCount();
-            // Debug.Log($"Steps count: {stepsCount}");
+            if (permissionName == RequiredPermissions[0])
+            {
+                // GetStepsRecords();
+            }
         }
 
         private int GetDayStepCount()

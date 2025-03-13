@@ -5,6 +5,7 @@ apply from: '../shared/keepUnitySymbols.gradle'
 dependencies {
     implementation "androidx.health.connect:connect-client:1.1.0-alpha12"
     implementation "androidx.activity:activity-ktx:1.10.1"
+    implementation "com.google.code.gson:gson:2.12.1"
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 **DEPS**}
 
