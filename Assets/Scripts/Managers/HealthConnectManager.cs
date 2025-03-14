@@ -1,18 +1,21 @@
-using System;
-using System.Collections.Generic;
 using System.Linq;
+using Data;
 using UnityEngine;
 using UnityEngine.Android;
 
 namespace Managers
 {
+    public static class HealthRecordType
+    {
+        public const string Steps = "STEPS";
+        public const string SleepSession = "SLEEP_SESSION";
+    }
+    
     public class HealthConnectManager : MonoBehaviour
     {
-        private AndroidJavaObject _healthConnectClient;
         private AndroidJavaObject _healthConnectPlugin;
 
-        private const string ProviderPackageName = "com.google.android.apps.healthdata";
-        private static readonly string[] RequiredPermissions = new[]
+        private static readonly string[] RequiredPermissions =
         {
             "android.permission.health.READ_STEPS",
             "android.permission.health.READ_SLEEP"
@@ -78,7 +81,7 @@ namespace Managers
             var timeRangeFilterClass = new AndroidJavaClass("androidx.health.connect.client.time.TimeRangeFilter");
             var timeRangeFilter = timeRangeFilterClass.CallStatic<AndroidJavaObject>("between", yesterday, now);
             
-            _healthConnectPlugin.Call("ReadStepsRecords", gameObject.name, "OnStepsRecords", timeRangeFilter);
+            _healthConnectPlugin.Call("ReadHealthRecords", timeRangeFilter, HealthRecordType.Steps, gameObject.name, "OnStepsRecords");
         }
 
         private void OnStepsRecords(string response)
