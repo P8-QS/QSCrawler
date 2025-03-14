@@ -1,11 +1,13 @@
 using System;
+using System.Collections.Generic;
+using Data.Models;
 using UnityEngine;
 
 namespace Data
 {
     public enum UserMetricsType
     {
-        StepsCount,
+        StepsRecords,
         SleepSession,
         TotalScreenTime
     }
@@ -14,15 +16,22 @@ namespace Data
     {
         public static UserMetricsHandler Instance { get; private set; }
         
-        public int StepsCount { get; private set; }
+        /// <summary>
+        /// Contains the user's steps count records. Can be null, so better to subscribe to the event instead.
+        /// </summary>
+        public IEnumerable<StepsRecord> StepsRecords { get; private set; }
+        
         public int SleepSession { get; private set; }
         public long TotalScreenTime { get; private set; }
 
+        public event Action<IEnumerable<StepsRecord>> OnStepsRecordsUpdated;
+        
         private void Awake()
         {
             if (Instance == null)
             {
                 Instance = this;
+                Debug.Log($"{nameof(UserMetricsHandler)} instance created");
                 DontDestroyOnLoad(this);
             }
             else
@@ -35,10 +44,12 @@ namespace Data
         {
             switch (userMetricsType)
             {
-                case UserMetricsType.StepsCount:
-                    if (data is int stepsCount)
+                case UserMetricsType.StepsRecords:
+                    if (data is IEnumerable<StepsRecord> stepsRecords)
                     {
-                        StepsCount = stepsCount;
+                        StepsRecords = stepsRecords;
+                        Debug.Log("Steps records have been updated");
+                        OnStepsRecordsUpdated?.Invoke(StepsRecords);
                     }
                     break;
                 case UserMetricsType.SleepSession:

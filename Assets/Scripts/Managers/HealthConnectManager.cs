@@ -1,5 +1,9 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using Data;
+using Data.Models;
+using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.Android;
 
@@ -10,17 +14,21 @@ namespace Managers
         public const string Steps = "STEPS";
         public const string SleepSession = "SLEEP_SESSION";
     }
+
+    public static class RequiredPermissions
+    {
+        public const string ReadSteps = "android.permission.health.READ_STEPS";
+        public const string ReadSleep = "android.permission.health.READ_SLEEP";
+
+        public static readonly string[] All = { ReadSteps, ReadSleep };
+    }
     
     public class HealthConnectManager : MonoBehaviour
     {
         private AndroidJavaObject _healthConnectPlugin;
-
-        private static readonly string[] RequiredPermissions =
-        {
-            "android.permission.health.READ_STEPS",
-            "android.permission.health.READ_SLEEP"
-        };
-
+        private AndroidJavaObject _endLdt;
+        private AndroidJavaObject _startLdt;
+        
         private void Start()
         {
             if (Application.platform != RuntimePlatform.Android)
@@ -28,6 +36,13 @@ namespace Managers
                 Debug.LogWarning("Not running on Android. Skipping Health Connect API initialization");
                 return;
             }
+            
+            var endDate = DateTime.Today;
+            var startDate = endDate.AddDays(-1);
+
+            var ldt = new AndroidJavaClass("java.time.LocalDateTime");
+            _endLdt = ldt.CallStatic<AndroidJavaObject>("of", endDate.Year, endDate.Month, endDate.Day, 0, 0, 0);
+            _startLdt = ldt.CallStatic<AndroidJavaObject>("of", startDate.Year, startDate.Month, startDate.Day, 0, 0, 0);
             
             InitializeHealthConnectClient();
         }
@@ -54,7 +69,7 @@ namespace Managers
         private void OnHealthConnectUnavailable(string response)
         {
             Debug.Log("Received Health Connect unavailable response from HealthConnectPlugin");
-            // TODO: Implement logic for when user does not have Health Connect installed.
+            RedirectToPlayStore();
         }
         
         private void OnHealthConnectUpdateRequired(string response)
@@ -72,33 +87,16 @@ namespace Managers
             {
                 var callbacks = new PermissionCallbacks();
                 callbacks.PermissionGranted += OnPermissionGranted;
-                Permission.RequestUserPermissions(RequiredPermissions, callbacks);
+                Permission.RequestUserPermissions(RequiredPermissions.All, callbacks);
             }
 
-            var ldt = new AndroidJavaClass("java.time.LocalDateTime");
-            var now = ldt.CallStatic<AndroidJavaObject>("now");
-            var yesterday = now.Call<AndroidJavaObject>("minusWeeks", (long)4);
-            var timeRangeFilterClass = new AndroidJavaClass("androidx.health.connect.client.time.TimeRangeFilter");
-            var timeRangeFilter = timeRangeFilterClass.CallStatic<AndroidJavaObject>("between", yesterday, now);
-            
-            _healthConnectPlugin.Call("ReadHealthRecords", timeRangeFilter, HealthRecordType.Steps, gameObject.name, "OnStepsRecords");
-        }
-
-        private void OnStepsRecords(string response)
-        {
-            Debug.Log("Received Health Connect steps response from HealthConnectPlugin::::JSON:::::");
-            Debug.Log(response);
-        }
-
-        private void OnPermissionsStatusReceived(string response)
-        {
-            Debug.Log("Received Health Connect permissions response from HealthConnectPlugin");
-            Debug.LogWarning(response);
+            // All required permissions are available from this point
+            GetUserSteps();
         }
         
         private static bool HasAllRequiredPermissions()
         {
-            var authorizedPermissions = RequiredPermissions.Select(Permission.HasUserAuthorizedPermission);
+            var authorizedPermissions = RequiredPermissions.All.Select(Permission.HasUserAuthorizedPermission);
             
             if (authorizedPermissions.Any(permission => permission == false))
             {
@@ -114,56 +112,41 @@ namespace Managers
 
         private void OnPermissionGranted(string permissionName)
         {
-            Debug.Log($"OnPermissionGranted: {permissionName}");
+            // This method is called for each permission that is granted by the user
+            Debug.Log($"Granted permission: {permissionName}");
 
-            if (permissionName == RequiredPermissions[0])
+            switch (permissionName)
             {
-                // GetStepsRecords();
+                case RequiredPermissions.ReadSteps:
+                    GetUserSteps();
+                    break;
+                case RequiredPermissions.ReadSleep:
+                    break;
             }
         }
-
-        private int GetDayStepCount()
+        
+        private void GetUserSteps()
         {
-            var ldt = new AndroidJavaClass("java.time.LocalDateTime");
-            var now = ldt.CallStatic<AndroidJavaObject>("now");
-            var yesterday = now.Call<AndroidJavaObject>("minusDays", (long)1);
-            
-            var stepsRecordClass = new AndroidJavaClass("androidx.health.connect.client.records.StepsRecord");
+            Debug.Log($"Getting user steps from: {_startLdt.Call<string>("toString")} to: {_endLdt.Call<string>("toString")}");
             
             var timeRangeFilterClass = new AndroidJavaClass("androidx.health.connect.client.time.TimeRangeFilter");
-            var timeRangeFilter = timeRangeFilterClass.CallStatic<AndroidJavaObject>("between", yesterday, now);
+            var timeRangeFilter = timeRangeFilterClass.CallStatic<AndroidJavaObject>("between", _startLdt, _endLdt);
             
-            var dataOrigin = new AndroidJavaObject("androidx.health.connect.client.records.metadata.DataOrigin", "QSCrawler");
-            
-            Debug.Log("Created dataOrigin");
-            
-            var readRequestClass = new AndroidJavaClass("androidx.health.connect.client.request.ReadRecordsRequest");
-            Debug.Log("Created request class");
-            
-            // TODO: FIIIIIIIIIIIIIIIIIIIIIIX
-            object[] parameters = {stepsRecordClass, timeRangeFilter, dataOrigin, true, 100, "1"};
-
-            Debug.Log($"stepsrecordclass print: {stepsRecordClass}");
-            
-
-            var readRequest = readRequestClass.Call<AndroidJavaObject>(
-                "getConstructor",
-                stepsRecordClass
-                // parameters
-            );
-            // var readRequest = new AndroidJavaObject("androidx.health.connect.client.request.ReadRecordsRequest", parameters);
-            Debug.Log("Created request class");
-
-            
-            // Debug.Log($"Read records request: {readRequest}");
-
-            
-            return 0;
+            _healthConnectPlugin.Call("ReadHealthRecords", timeRangeFilter, HealthRecordType.Steps, gameObject.name, "OnStepsRecordsReceived");
         }
 
+        private void OnStepsRecordsReceived(string response)
+        {
+            Debug.Log("Received Health Connect steps response from HealthConnectPlugin::::JSON:::::");
+            Debug.Log(response);
+
+            var records = JsonConvert.DeserializeObject<IEnumerable<StepsRecord>>(response);
+            UserMetricsHandler.Instance.SetData(UserMetricsType.StepsRecords, records);
+        }
+        
         private void RedirectToPlayStore()
         {
-            throw new System.NotImplementedException();
+            // TODO: Implement logic for when user does not have Health Connect installed.
         }
     }
 }
