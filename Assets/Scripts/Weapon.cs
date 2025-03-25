@@ -61,15 +61,14 @@ public class Weapon : Collidable
     private void calcWeaponDmg()
     {
         weaponLevel = getWeaponLevel();
-        int fighterLvl = Fighter.currentLevel;
-        float weaponDmg = (10f + (float)Mathf.Floor(4 * Mathf.Pow(fighterLvl, 1.2f)));
+        float weaponDmg = (10f + (float)Mathf.Floor(4 * Mathf.Pow(weaponLevel, 1.2f)));
         minDamage = Mathf.RoundToInt(weaponDmg * 0.5f);
         maxDamage = Mathf.RoundToInt(weaponDmg * 1.5f);
     }
 
     private int getWeaponLevel()
     {
-        return weaponLevel = Fighter.currentLevel;
+        return weaponLevel = GameManager.instance.XpManager.Level;
     }
     
     private void Swing()

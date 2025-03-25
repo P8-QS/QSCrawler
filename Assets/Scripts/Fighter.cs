@@ -6,7 +6,7 @@ public class Fighter : MonoBehaviour
     public int hitpoint;
     public int maxHitpoint;
     public float pushRecoverySpeed = 0.2f;
-    public static int currentLevel = 3;
+    public int currentLevel;
 
     // Immunity
     private float immuneTime = 1.0f;
@@ -31,8 +31,12 @@ public class Fighter : MonoBehaviour
             healthBar = HealthBarManager.Instance.CreateHealthBar(this);
         }
 
-        maxHitpoint = 100 + (int)(25 + Mathf.Pow(Fighter.currentLevel, 1.2f));
+        currentLevel = GameManager.instance.XpManager.Level;
+        Debug.Log(currentLevel);
+
+        maxHitpoint = 100 + (int)(25 + Mathf.Pow(currentLevel, 1.2f));
         hitpoint = maxHitpoint;
+
     }
 
     protected virtual void OnDestroy()

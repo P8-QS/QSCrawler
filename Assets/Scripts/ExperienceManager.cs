@@ -22,7 +22,7 @@ public class ExperienceManager
         }
     }
     public int ExperienceMax { get; private set; }
-    public int Level { get; private set; }
+    public int Level { get; private set; } = 1;
 
     public ExperienceManager(int xp = 0)
     {
@@ -30,8 +30,8 @@ public class ExperienceManager
     }
 
     private int CalculateLevelFromTotalXp(int totalXp)
-    {   
-        int level = 0;
+    {
+        int level = 1;
         int xp = 0;
 
         while (xp <= totalXp)
@@ -45,11 +45,11 @@ public class ExperienceManager
     // Calculates XP required to level up
     private int LevelToXpRequired(int level)
     {
-        if (level == 0)
+        if (level == 1)
         {
             return 50;
         }
-        return (int)Math.Pow(level, 1.5)*100;
+        return (int)Math.Pow(level, 1.5) * 100;
     }
 
     // Adds XP and handles level-ups
@@ -61,7 +61,7 @@ public class ExperienceManager
     // XP gained from defeating an enemy
     public int AddEnemy(int enemyLevel)
     {
-        int xp =  10 * (enemyLevel * enemyLevel);
+        int xp = 10 * (enemyLevel * enemyLevel);
         AddExperience(xp);
         return xp;
     }
@@ -69,7 +69,7 @@ public class ExperienceManager
     // XP gained from defeating a boss
     public int AddBoss(int enemyLevel)
     {
-        int xp =  30 * (enemyLevel * enemyLevel);
+        int xp = 30 * (enemyLevel * enemyLevel);
         AddExperience(xp);
         return xp;
     }
