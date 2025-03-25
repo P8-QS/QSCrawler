@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 public class Player : Mover
@@ -15,10 +16,15 @@ public class Player : Mover
         initialSize = transform.localScale;
     }
 
+    protected void Update()
+    {
+        currentLevel = GameManager.instance.XpManager.Level;
+    }
+
     private void FixedUpdate()
     {
         Vector3 input = new Vector3(joystickMove.movementJoystick.Direction.x, joystickMove.movementJoystick.Direction.y, 0);
-
+        
         UpdateMotor(input);
     }
 
