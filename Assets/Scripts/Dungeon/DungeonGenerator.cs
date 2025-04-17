@@ -10,11 +10,11 @@ namespace Dungeon
         [Header("References")]
         [Tooltip("The grid component.")]
         public Grid grid;
-
-        public TileBase doorTileClosedHorizontal;
-        public TileBase doorTileClosedVertical;
+        
         public TileBase wallRuleTile;
-
+        public GameObject doorHorizontal;
+        public GameObject doorVertical;
+        
         [Tooltip("Optional. Will be populated at runtime.")]
         public Transform generatedRoomsParent;
 
@@ -27,35 +27,16 @@ namespace Dungeon
         public int maxAttemptsPerDoor = 10;
         public float doorPositionMatchTolerance = 0.01f;
 
-                [Header("Seeding")]
-         [SerializeField] private bool useRandomSeed = true;
-         [SerializeField] private int seed;
-         [SerializeField] private bool logSeedOnGeneration = true;
+        [Header("Seeding")]
+        public bool useRandomSeed = true;
+        public int seed;
+        public bool logSeedOnGeneration = true;
          
-         private System.Random seededRandom;
-         private int currentSeed;
- 
+        private System.Random _seededRandom;
+        private int _currentSeed;
 
         public readonly List<RoomInstance> PlacedRooms = new();
-
-        public class RoomInstance
-        {
-            public readonly GameObject GameObject;
-            public readonly Room RoomScript;
-            public readonly Bounds Bounds;
-            public readonly Vector3Int Offset;
-            public readonly List<Transform> AvailableDoors;
-
-            public RoomInstance(GameObject go, Room room, Bounds b, Vector3Int offset)
-            {
-                GameObject = go;
-                RoomScript = room;
-                Bounds = b;
-                Offset = offset;
-                AvailableDoors = new List<Transform>(room.GetDoorTransforms());
-            }
-        }
-
+        
         public void GenerateDungeon()
         {
             ClearDungeon();
@@ -98,28 +79,28 @@ namespace Dungeon
          {
              if (useRandomSeed)
              {
-                 currentSeed = System.DateTime.Now.Millisecond;
-                 seed = currentSeed;
+                 _currentSeed = System.DateTime.Now.Millisecond;
+                 seed = _currentSeed;
              }
              else
              {
-                 currentSeed = seed;
+                 _currentSeed = seed;
              }
-             seededRandom = new System.Random(currentSeed);
+             _seededRandom = new System.Random(_currentSeed);
              if (logSeedOnGeneration)
              {
-                 Debug.Log($"Dungeon generation seed: {currentSeed}");
+                 Debug.Log($"Dungeon generation seed: {_currentSeed}");
              }
          }
  
          private int GetRandomRange(int min, int max)
          {
-             return seededRandom.Next(min, max);
+             return _seededRandom.Next(min, max);
          }
  
          private float GetRandomValue()
          {
-             return (float)seededRandom.NextDouble();
+             return (float)_seededRandom.NextDouble();
          }
 
         private void GenerationLoop()
@@ -203,7 +184,7 @@ namespace Dungeon
             for (var i = parentToClear.childCount - 1; i >= 0; i--)
             {
                 var childGo = parentToClear.GetChild(i).gameObject;
-                if (childGo.GetComponent<Room>() is null) continue;
+                // if (childGo.GetComponent<Room>() is null) continue;
                 if (Application.isPlaying)
                     Destroy(childGo);
                 else
@@ -239,48 +220,56 @@ namespace Dungeon
 
         private void FillDoorLocations()
         {
+            HashSet<Vector3> placedDoorPositions = new();
+            
             foreach (var room in PlacedRooms)
             {
                 foreach (var doorInfo in room.RoomScript.GetDoorPrefabData())
                 {
-                    var centerGridPos = room.RoomScript.wallsTilemap.WorldToCell(doorInfo.localPosition);
-                    var isDoor = !room.AvailableDoors.Any(dt =>
+                    var worldDoorPos = doorInfo.localPosition + room.GameObject.transform.position;
+                    
+                    if (placedDoorPositions.Any(p => Vector3.Distance(p, worldDoorPos) < doorPositionMatchTolerance)) continue;
+                    
+                    var isConnected = !room.AvailableDoors.Any(dt =>
                         Vector3.Distance(dt.localPosition, doorInfo.localPosition) < doorPositionMatchTolerance);
-
-
-                    // Determine direction offsets
-                    Vector3Int offset1, offset2;
-                    TileBase tile;
-                    switch (doorInfo.direction)
+                    
+                    if (isConnected)
                     {
-                        case "North":
-                        case "South":
-                            tile = isDoor ? doorTileClosedHorizontal : wallRuleTile;
-                            offset1 = Vector3Int.up;
-                            offset2 = Vector3Int.right + Vector3Int.up;
-                            break;
-                        case "East":
-                        case "West":
-                            tile = isDoor ? doorTileClosedVertical : wallRuleTile;
-                            offset1 = Vector3Int.zero;
-                            offset2 = Vector3Int.up;
-                            break;
-                        default:
-                            Debug.LogWarning($"Unknown door direction: {doorInfo.direction}");
-                            continue;
-                    }
-
-                    if (isDoor)
-                    {
-                        room.RoomScript.doorsTilemap.SetTile(centerGridPos + room.Offset + offset1, tile);
+                        var doorGo = (doorInfo.direction is "North" or "South") 
+                            ? doorHorizontal 
+                            : doorVertical;
+                        
+                        var doorInstance = Instantiate(doorGo, worldDoorPos, Quaternion.identity, grid.transform);
+                        var doorController = doorInstance.GetComponent<DoorController>();
+                        
+                        doorController.RoomA = room.RoomScript;
+                        doorController.RoomB = FindOtherRoomAtPosition(room, worldDoorPos);
+                        
+                        room.RoomScript.connectedDoors.Add(doorController);
+                        doorController.RoomB?.connectedDoors.Add(doorController);
+                        
+                        placedDoorPositions.Add(worldDoorPos);
                     }
                     else
                     {
-                        room.RoomScript.wallsTilemap.SetTile(centerGridPos + room.Offset + offset1, tile);
-                        room.RoomScript.wallsTilemap.SetTile(centerGridPos + room.Offset + offset2, tile);
+                        var cellDoorPos = room.RoomScript.wallsTilemap.WorldToCell(worldDoorPos);
+                        var offset = doorInfo.direction is "North" or "South" ? Vector3Int.left : Vector3Int.down;
+                        
+                        room.RoomScript.wallsTilemap.SetTile(cellDoorPos, wallRuleTile);
+                        room.RoomScript.wallsTilemap.SetTile(cellDoorPos + offset, wallRuleTile);
                     }
                 }
             }
+        }
+
+        private Room FindOtherRoomAtPosition(RoomInstance currentRoom, Vector3 worldDoorPos)
+        {
+            return PlacedRooms.SingleOrDefault(otherRoom => 
+                    otherRoom != currentRoom &&
+                    otherRoom.RoomScript.GetDoorPrefabData()
+                        .Select(door => otherRoom.GameObject.transform.position + door.localPosition)
+                        .Any(pos => Vector3.Distance(pos, worldDoorPos) < doorPositionMatchTolerance))
+                    ?.RoomScript;
         }
 
         private void SetRoomTilemapOrder()
@@ -301,8 +290,7 @@ namespace Dungeon
                 }
             }
         }
-
-
+        
         private bool TryPlaceRoom(GameObject roomPrefab, Vector3Int gridPosition)
         {
             var roomPrefabScript = roomPrefab.GetComponent<Room>();
@@ -312,26 +300,24 @@ namespace Dungeon
                 return false;
             }
 
-            var potentialBounds = roomPrefabScript.GetRoomBounds();
-            var potentialPosition = grid.GetCellCenterWorld(gridPosition);
-            potentialBounds.center += potentialPosition;
+            var targetWorldPos = grid.GetCellCenterWorld(gridPosition);
+            var potentialBounds = roomPrefabScript.CalculateRoomBoundsAt(targetWorldPos);
 
-            if (PlacedRooms.Any(existingRoom => BoundsOverlap(potentialBounds, existingRoom.Bounds)))
+            if (PlacedRooms.Any(existingRoom => BoundsOverlap(potentialBounds, existingRoom.RoomScript.GetOrCalculateRoomBounds())))
             {
-                Debug.LogWarning("Detected overlap");
                 return false;
             }
 
             // No collisions detected, safe to instantiate
             var roomInstanceGo = Instantiate(roomPrefab, generatedRoomsParent, true);
             roomInstanceGo.name = $"{roomPrefab.name}_({potentialBounds.center.x},{potentialBounds.center.y})";
-            roomInstanceGo.transform.position = potentialPosition;
+            roomInstanceGo.transform.position = targetWorldPos;
+            
             var roomScript = roomInstanceGo.GetComponent<Room>();
-            roomScript.InvalidateBoundsCache();
-
-            var newInstance = new RoomInstance(roomInstanceGo, roomScript, potentialBounds, gridPosition);
+            
+            roomScript.GetOrCalculateRoomBounds();
+            var newInstance = new RoomInstance(roomInstanceGo, roomScript);
             PlacedRooms.Add(newInstance);
-
             return true;
         }
 

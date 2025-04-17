@@ -45,11 +45,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   grid: {fileID: 0}
-  doorTileClosedHorizontal: {fileID: 11400000, guid: 59cb4da8ec62ec744b1371702ca500e0, type: 2}
-  doorTileClosedVertical: {fileID: 11400000, guid: d2d482f1714e6214c839fcd5a180d944, type: 2}
   wallRuleTile: {fileID: 11400000, guid: 1cb06dc55f9dbec4fb63257b056d8167, type: 2}
+  doorHorizontal: {fileID: 61588212227970721, guid: 7a597f5d3bc49a600aa008c3c72ad64c, type: 3}
+  doorVertical: {fileID: 4364219828165580310, guid: 73358fdccfeef1a7d86efe786191d81f, type: 3}
   generatedRoomsParent: {fileID: 0}
-  startRoomPrefab: {fileID: 3961992995672916024, guid: b9c3ed758a18f4b44a51cbca1a995bef, type: 3}
+  startRoomPrefab: {fileID: 993366572000607133, guid: 7c0bee3f4b7e540808d66cf4e91d4d7b, type: 3}
   roomPrefabs:
   - {fileID: 3961992995672916024, guid: b9c3ed758a18f4b44a51cbca1a995bef, type: 3}
   - {fileID: 1994943969328927481, guid: 2f60b26647ade81ad9c7e19613ca643d, type: 3}
@@ -61,3 +61,6 @@ MonoBehaviour:
   maxRooms: 10
   maxAttemptsPerDoor: 10
   doorPositionMatchTolerance: 0.01
+  useRandomSeed: 1
+  seed: 687
+  logSeedOnGeneration: 1
