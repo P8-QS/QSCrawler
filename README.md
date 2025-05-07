@@ -55,7 +55,7 @@ Your daily habits influence your in-game stats, environment, and enemies — enc
 - **Health Awareness Through Play**  
   Understand your own wellness trends through game feedback and daily summaries.
 
-- **Turn-Based Dungeon Crawling**  
+- **Customized Dungeon Crawling**  
   Battle through procedurally generated levels with classic dungeon-crawler mechanics.
 
 - **Health Platform Integration**  
@@ -122,7 +122,7 @@ At the start of each dungeon run, you’ll receive:
 **Daily Dungeon Challenge** was developed as part of a research project at **Aalborg University**,  
 investigating how gamified health data can promote reflection, understanding, and behavior change.
 
-Read more in the accompanying [paper](https://your-paper-link.com) (Paper not finished yet).
+Read more in the accompanying [paper](placeholder) (Paper not finished yet).
 
 ---
 
