@@ -1,0 +1,58 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  createRelease:
+    name: Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Parse the bundleVersion from ProjectSettings.asset
+      - name: Extract bundleVersion
+        id: extract_version
+        run: |
+          bundleVersion=$(grep "bundleVersion:" ProjectSettings/ProjectSettings.asset | awk '{print $2}')
+          echo "Bundle Version: $bundleVersion"
+          echo "version=$bundleVersion" >> $GITHUB_ENV
+
+      # Download the APK artifact from the build workflow
+      - name: Download APK Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Build-Android # This matches the artifact name in your build workflow
+          path: ./build/apk   # Specify where to save the downloaded artifact
+
+      # Rename the APK to match the desired name format
+      - name: Rename APK
+        run: |
+          mv ./build/apk/*.apk ./build/apk/qscrawler_v${{ env.version }}.apk
+
+      # Create a GitHub release and attach the APK
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.version }}
+          release_name: Release v${{ env.version }}
+          body: |
+            This release was created automatically using the bundleVersion from ProjectSettings/ProjectSettings.asset.
+          draft: false
+          prerelease: false
+
+      # Upload the renamed APK to the release
+      - name: Upload APK to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: ./build/apk/qscrawler_v${{ env.version }}.apk
+          asset_name: qscrawler_v${{ env.version }}.apk
+          asset_content_type: application/vnd.android.package-archive
